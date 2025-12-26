@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // --- USERS ---
+    match /users/{userId} {
+      // DEV NOTE: 'list' allowed for Admin Dashboard demo
+      allow read: if isAuthenticated(); 
+      allow write: if isOwner(userId);
+    }
+
+    // --- REPORTS ---
+    match /reports/{reportId} {
+      allow read: if resource.data.userId == request.auth.uid || isAuthenticated(); // Allow admin read
+      allow write: if request.auth.uid == request.resource.data.userId; 
+    }
+
+    // --- WALLET ---
+    // DEV NOTE: 'write' allowed for MVP demo. In Prod, set to 'false' (Admin only).
+    match /wallet/{userId} {
+      allow read: if isOwner(userId) || isAuthenticated(); // Allow admin read
+      allow write: if isOwner(userId); 
+    }
+
+    // --- WALLET TRANSACTIONS ---
+    // DEV NOTE: 'write' allowed for MVP demo. In Prod, set to 'false' (Admin only).
+    match /walletTransactions/{txId} {
+      allow read: if resource.data.walletId == request.auth.uid || isAuthenticated(); // Allow admin read
+      allow write: if request.resource.data.walletId == request.auth.uid;
+    }
+
+    // --- CHATS ---
+    match /chats/{chatId} {
+      allow read: if resource.data.userId == request.auth.uid || isAuthenticated();
+      allow write: if request.resource.data.userId == request.auth.uid;
+    }
+
+    // --- CHAT MESSAGES ---
+    match /chatMessages/{messageId} {
+      // DEV NOTE: Relaxed for MVP to allow client to save AI responses.
+      allow read, write: if isAuthenticated();
+    }
+
+    // --- PROMPTS (New for Phase 2) ---
+    match /prompts/{promptId} {
+      // DEV NOTE: Open for demo admin
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
