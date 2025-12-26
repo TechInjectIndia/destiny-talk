@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, limit, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, limit, Timestamp, getDocs } from 'firebase/firestore';
 import { db, isConfigured } from '../../packages/utils/firebase';
 import { Button, Card, Input, TextArea } from '../../packages/ui/index';
 
@@ -11,7 +11,7 @@ interface SystemPrompt {
   version: string;
   content: string;
   isActive: boolean;
-  createdAt: any;
+  createdAt: Timestamp;
 }
 
 interface Order {
@@ -21,7 +21,7 @@ interface Order {
   currency: string;
   status: 'created' | 'paid' | 'failed';
   provider: 'stripe_sim' | 'razorpay_sim';
-  createdAt: any;
+  createdAt: Timestamp;
   description: string;
 }
 
@@ -29,8 +29,8 @@ interface AnalyticsEvent {
   id?: string;
   eventName: string;
   userId?: string;
-  params: any;
-  timestamp: any;
+  params: Record<string, unknown>;
+  timestamp: Timestamp;
 }
 
 interface UserProfile {
@@ -43,7 +43,7 @@ interface UserProfile {
     tob: string;
     pob: string;
     gender: 'male' | 'female';
-    createdAt: any;
+    createdAt: Timestamp;
   }
 
 // --- DEFAULTS ---
@@ -103,8 +103,8 @@ const AdminPromptManager = () => {
 
         {isEditing ? (
             <Card title="Edit Prompt">
-                <Input label="Version Label (e.g. v1.1)" value={editPrompt.version || ''} onChange={(e: any) => setEditPrompt({ ...editPrompt, version: e.target.value })} />
-                <TextArea label="System Prompt Content" value={editPrompt.content || ''} onChange={(e: any) => setEditPrompt({ ...editPrompt, content: e.target.value })} rows={15} />
+                <Input label="Version Label (e.g. v1.1)" value={editPrompt.version || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditPrompt({ ...editPrompt, version: e.target.value })} />
+                <TextArea label="System Prompt Content" value={editPrompt.content || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditPrompt({ ...editPrompt, content: e.target.value })} rows={15} />
                 <div style={{ marginBottom: '10px' }}><label><input type="checkbox" checked={editPrompt.isActive || false} onChange={(e) => setEditPrompt({ ...editPrompt, isActive: e.target.checked })} /> Set as Active</label></div>
                 <div style={{ display: 'flex', gap: '10px' }}><Button onClick={handleSave}>Save Prompt</Button><Button variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button></div>
             </Card>

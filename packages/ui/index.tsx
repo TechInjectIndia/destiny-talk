@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
 
-export const Card = ({ children, title, style = {} }: { children?: React.ReactNode; title: string; style?: React.CSSProperties }) => (
+export interface CardProps {
+  children?: React.ReactNode;
+  title: string;
+  style?: React.CSSProperties;
+}
+
+export const Card = ({ children, title, style = {} }: CardProps) => (
   <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', margin: '16px 0', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', ...style }}>
     <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.25rem', fontWeight: 600, color: '#111' }}>{title}</h3>
     {children}
   </div>
 );
 
-export const Button = ({ onClick, children, variant = 'primary', disabled = false, style = {}, title }: { onClick: () => void, children: React.ReactNode, variant?: 'primary' | 'secondary' | 'danger' | 'success', disabled?: boolean, style?: React.CSSProperties, title?: string }) => {
+export interface ButtonProps {
+  onClick: () => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'danger' | 'success';
+  disabled?: boolean;
+  style?: React.CSSProperties;
+  title?: string;
+}
+
+export const Button = ({ onClick, children, variant = 'primary', disabled = false, style = {}, title }: ButtonProps) => {
   let bg = '#000';
   let color = '#fff';
 
@@ -38,14 +53,14 @@ export const Button = ({ onClick, children, variant = 'primary', disabled = fals
   );
 };
 
-export const Input = ({ label, value, onChange, type = "text", placeholder, style = {} }: any) => (
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+}
+
+export const Input = ({ label, style = {}, ...props }: InputProps) => (
   <div style={{ marginBottom: '12px' }}>
     {label && <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{label}</label>}
     <input 
-      type={type} 
-      value={value} 
-      onChange={onChange}
-      placeholder={placeholder}
       style={{ 
         width: '100%', 
         padding: '10px', 
@@ -54,16 +69,19 @@ export const Input = ({ label, value, onChange, type = "text", placeholder, styl
         boxSizing: 'border-box',
         ...style
       }} 
+      {...props}
     />
   </div>
 );
 
-export const TextArea = ({ label, value, onChange, rows = 5 }: any) => (
+export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+}
+
+export const TextArea = ({ label, rows = 5, style = {}, ...props }: TextAreaProps) => (
     <div style={{ marginBottom: '12px' }}>
       {label && <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>{label}</label>}
       <textarea 
-        value={value} 
-        onChange={onChange}
         rows={rows}
         style={{ 
           width: '100%', 
@@ -72,13 +90,21 @@ export const TextArea = ({ label, value, onChange, rows = 5 }: any) => (
           border: '1px solid #d1d5db',
           boxSizing: 'border-box',
           fontFamily: 'monospace',
-          fontSize: '0.9rem'
+          fontSize: '0.9rem',
+          ...style
         }} 
+        {...props}
       />
     </div>
 );
 
-export const PaymentModal = ({ amount, onClose, onSuccess }: { amount: number, onClose: () => void, onSuccess: () => void }) => {
+export interface PaymentModalProps {
+  amount: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export const PaymentModal = ({ amount, onClose, onSuccess }: PaymentModalProps) => {
     const [status, setStatus] = useState<'processing' | 'success' | 'failed'>('processing');
 
     useEffect(() => {

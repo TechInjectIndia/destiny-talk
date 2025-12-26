@@ -85,5 +85,7 @@
 ## Phase 3: Scale & Polish 🌍
 - [x] **Analytics:** Integrate PostHog or custom Firestore analytics.
 - [x] **Voice Mode:** Implement Speech-to-Text and Text-to-Speech.
+- [x] **Architecture Refactor:** Split Client/Admin apps, Create Shared UI Package.
+- [x] **Strict Typing:** Enforce TypeScript interfaces across all apps and packages.
 - [ ] **Mobile:** Evaluate React Native wrapper.
 - [ ] **Localization:** Support Hindi/Spanish prompts.

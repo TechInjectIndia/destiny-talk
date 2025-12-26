@@ -11,6 +11,7 @@ import {
 import { 
   doc, 
   getDoc, 
+  getDocs,
   setDoc, 
   serverTimestamp,
   runTransaction,
@@ -21,6 +22,7 @@ import {
   onSnapshot,
   limit,
   addDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import ReactMarkdown from "react-markdown";
 
@@ -41,7 +43,7 @@ interface UserProfile {
   tob: string;
   pob: string;
   gender: 'male' | 'female';
-  createdAt: any;
+  createdAt: Timestamp;
 }
 
 interface WalletTransaction {
@@ -51,7 +53,7 @@ interface WalletTransaction {
   amount: number;
   description: string;
   referenceId?: string;
-  timestamp: any;
+  timestamp: Timestamp;
   status: 'success' | 'pending' | 'failed';
 }
 
@@ -60,7 +62,7 @@ interface FullReport {
   userId: string;
   numerologyData: NumerologyReport;
   fullReportMarkdown: string;
-  createdAt: any;
+  createdAt: Timestamp;
   version: string;
 }
 
@@ -69,7 +71,7 @@ interface ChatMessage {
   chatId: string;
   sender: 'user' | 'ai';
   content: string;
-  timestamp: any;
+  timestamp: Timestamp;
   isPaid?: boolean;
 }
 
@@ -104,8 +106,8 @@ const AuthScreen = ({ onLogin }: { onLogin: () => void }) => {
   return (
     <div style={{ maxWidth: '400px', margin: '40px auto' }}>
       <Card title={isSignUp ? "Create Account" : "Welcome Back"}>
-        <Input label="Email" value={email} onChange={(e: any) => setEmail(e.target.value)} type="email" placeholder="you@example.com" />
-        <Input label="Password" value={password} onChange={(e: any) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
+        <Input label="Email" value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} type="email" placeholder="you@example.com" />
+        <Input label="Password" value={password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
         {error && <div style={{ color: 'red', marginBottom: '10px', fontSize: '0.9rem' }}>{error}</div>}
         <Button onClick={handleAuth}>{isSignUp ? "Sign Up" : "Log In"}</Button>
         <div style={{ textAlign: 'center', margin: '10px 0', fontSize: '0.9rem', color: '#666' }}>OR</div>
@@ -143,15 +145,15 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
     <div style={{ maxWidth: '500px', margin: '40px auto' }}>
       <Card title="Setup Your Profile">
         <p style={{ color: '#666', marginBottom: '20px' }}>To generate accurate numerology reports, we need your birth details.</p>
-        <Input label="Full Name" value={formData.displayName} onChange={(e: any) => setFormData({...formData, displayName: e.target.value})} placeholder="John Doe" />
+        <Input label="Full Name" value={formData.displayName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, displayName: e.target.value})} placeholder="John Doe" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-          <Input label="Day" value={formData.dobDay} onChange={(e: any) => setFormData({...formData, dobDay: e.target.value})} placeholder="DD" type="number" />
-          <Input label="Month" value={formData.dobMonth} onChange={(e: any) => setFormData({...formData, dobMonth: e.target.value})} placeholder="MM" type="number" />
-          <Input label="Year" value={formData.dobYear} onChange={(e: any) => setFormData({...formData, dobYear: e.target.value})} placeholder="YYYY" type="number" />
+          <Input label="Day" value={formData.dobDay} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dobDay: e.target.value})} placeholder="DD" type="number" />
+          <Input label="Month" value={formData.dobMonth} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dobMonth: e.target.value})} placeholder="MM" type="number" />
+          <Input label="Year" value={formData.dobYear} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dobYear: e.target.value})} placeholder="YYYY" type="number" />
         </div>
-        <Input label="Time of Birth (Optional)" value={formData.tob} onChange={(e: any) => setFormData({...formData, tob: e.target.value})} placeholder="HH:MM AM/PM" />
-        <Input label="Place of Birth" value={formData.pob} onChange={(e: any) => setFormData({...formData, pob: e.target.value})} placeholder="City, Country" />
-        <div style={{ marginBottom: '20px' }}><label style={{ display: 'block', marginBottom: '4px', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>Gender</label><select value={formData.gender} onChange={(e: any) => setFormData({...formData, gender: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}><option value="male">Male</option><option value="female">Female</option></select></div>
+        <Input label="Time of Birth (Optional)" value={formData.tob} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, tob: e.target.value})} placeholder="HH:MM AM/PM" />
+        <Input label="Place of Birth" value={formData.pob} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, pob: e.target.value})} placeholder="City, Country" />
+        <div style={{ marginBottom: '20px' }}><label style={{ display: 'block', marginBottom: '4px', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>Gender</label><select value={formData.gender} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value as 'male' | 'female'})} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}><option value="male">Male</option><option value="female">Female</option></select></div>
         <Button onClick={handleSubmit} disabled={loading}>{loading ? "Saving..." : "Complete Profile"}</Button>
       </Card>
     </div>
@@ -280,7 +282,7 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
   const chatId = `chat_${report.reportId}`;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const systemPromptTemplate = useSystemPrompt('chat_consultant');
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null); // Type check for WebSpeech API isn't built-in easily for React refs without extending
 
   useEffect(() => {
     if (!isConfigured) return;
@@ -297,6 +299,7 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
         alert("Voice input is not supported in this browser. Try Chrome.");
         return;
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
@@ -305,6 +308,7 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
     
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInputText(prev => prev + (prev ? ' ' : '') + transcript);
@@ -436,7 +440,7 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
       </div>
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
-            <Input value={inputText} onChange={(e: any) => setInputText(e.target.value)} placeholder="Ask a specific question..." style={{ marginBottom: 0 }} />
+            <Input value={inputText} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)} placeholder="Ask a specific question..." style={{ marginBottom: 0 }} />
         </div>
         <Button 
             onClick={startListening} 
@@ -486,7 +490,7 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
 
       const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: [{ role: 'user', parts: [{ text: "Generate my Destiny Blueprint." }] }], config: { systemInstruction: filledPrompt } });
       
-      const newReportData: FullReport = { reportId, userId: profile.uid, numerologyData: coreNumbers, fullReportMarkdown: response.text || "Error", createdAt: serverTimestamp(), version: 'v1.0' };
+      const newReportData: FullReport = { reportId, userId: profile.uid, numerologyData: coreNumbers, fullReportMarkdown: response.text || "Error", createdAt: serverTimestamp() as Timestamp, version: 'v1.0' };
       await setDoc(doc(db, 'reports', reportId), newReportData);
       setGeneratedReport(newReportData);
       await logEvent('report_purchase', { reportId }, profile.uid);
@@ -595,4 +599,4 @@ export default function ClientApp() {
         </main>
       </div>
     );
-};
+}
