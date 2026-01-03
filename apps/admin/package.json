@@ -15,6 +15,7 @@
     "react-dom": "^18.2.0",
     "firebase": "^11.0.0",
     "@destiny-ai/ui": "workspace:*",
+    "@destiny-ai/core": "workspace:*",
     "@destiny-ai/database": "workspace:*"
   },
   "devDependencies": {

@@ -21,6 +21,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
+    "@destiny-ai/core": "workspace:*",
     "firebase": "^11.0.0",
     "firebase-admin": "^11.0.0"
   },
