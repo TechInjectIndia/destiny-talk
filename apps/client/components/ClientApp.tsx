@@ -12,9 +12,10 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import ReactMarkdown from "react-markdown";
+import toast from 'react-hot-toast';
 
 import { auth, isConfigured, FirebaseUserRepository, FirebaseWalletRepository, FirebaseReportRepository, FirebaseChatRepository, FirebasePromptRepository, FirebaseOrderRepository, FirebaseAnalyticsRepository } from '@destiny-ai/database';
-import { generateNumerologyProfile, NumerologyReport, UserProfile, WalletTransaction, FullReport, ChatMessage, Order, Wallet } from '@destiny-ai/core';
+import { generateNumerologyProfile, NumerologyReport, UserProfile, WalletTransaction, FullReport, ChatMessage } from '@destiny-ai/core';
 import { Button, Card, Input, PaymentModal } from '@destiny-ai/ui';
 
 // --- DEFAULTS ---
@@ -91,7 +92,10 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!formData.dobDay || !formData.dobMonth || !formData.dobYear || !formData.displayName) { alert("Please fill in all required fields."); return; }
+    if (!formData.dobDay || !formData.dobMonth || !formData.dobYear || !formData.displayName) { 
+      toast.error("Please fill in all required fields."); 
+      return; 
+    }
     setLoading(true);
     try {
       // Use saveUser which handles creation/update with merge
@@ -103,8 +107,14 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
       }
 
       await analyticsRepo.logEvent({ eventName: 'onboarding_complete', params: { uid: user.uid }, userId: user.uid });
+      toast.success("Profile saved successfully!");
       onComplete();
-    } catch (e) { console.error(e); alert("Error saving profile."); } finally { setLoading(false); }
+    } catch (e) { 
+      console.error(e); 
+      toast.error("Error saving profile."); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -148,11 +158,13 @@ const WalletView = ({ userId }: { userId: string }) => {
             status: 'created',
             provider: 'stripe_sim',
             description: 'Wallet Recharge',
+            createdAt: new Date(),
         });
         setActivePayment(amount);
+        toast.success(`Payment initiated for ₹${amount}`);
     } catch (e: unknown) { 
       const error = e as Error;
-      alert("Failed to start payment: " + error.message); 
+      toast.error("Failed to start payment: " + error.message); 
     }
   };
 
@@ -170,9 +182,10 @@ const WalletView = ({ userId }: { userId: string }) => {
 
         await walletRepo.processPaymentSuccess(userId, amount, pendingOrder.id, 'Wallet Recharge');
         await analyticsRepo.logEvent({ eventName: 'payment_success', params: { amount }, userId });
+        toast.success(`Payment successful! ₹${amount} added to wallet.`);
      } catch (e: unknown) { 
        const error = e as Error;
-       alert("Fulfillment failed: " + error.message); 
+       toast.error("Fulfillment failed: " + error.message); 
      }
   };
 
@@ -243,7 +256,7 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
 
   const startListening = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert("Voice input is not supported in this browser. Try Chrome.");
+        toast.error("Voice input is not supported in this browser. Try Chrome.");
         return;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,7 +292,10 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
-    if (walletBalance < 10) { alert("Insufficient wallet balance. Please add funds to start consultation."); return; }
+    if (walletBalance < 10) { 
+      toast.error("Insufficient wallet balance. Please add funds to start consultation."); 
+      return; 
+    }
     
     setSending(true);
     const userMessageContent = inputText;
@@ -344,9 +360,9 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
         const error = e as Error;
         console.error(error); 
         if (error.message.includes("Insufficient Balance")) {
-            alert("The spirits are ready to answer, but your wallet is empty. Please recharge.");
+            toast.error("The spirits are ready to answer, but your wallet is empty. Please recharge.");
         } else {
-            alert("Error: " + error.message); 
+            toast.error("Error: " + error.message); 
         }
     } finally { 
         setSending(false); 
@@ -406,8 +422,14 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
   useEffect(() => { setGeneratedReport(existingReport); }, [existingReport]);
 
   const handleUnlockReport = async () => {
-    if (walletBalance < 100) { alert("Insufficient Balance."); return; }
-    if (!process.env.API_KEY) { alert("API Key is missing."); return; }
+    if (walletBalance < 100) { 
+      toast.error("Insufficient Balance. Please add funds to your wallet."); 
+      return; 
+    }
+    if (!process.env.API_KEY) { 
+      toast.error("API Key is missing. Please contact support."); 
+      return; 
+    }
     setLoading(true);
     try {
       const reportId = 'rep_' + profile.uid;
@@ -452,10 +474,11 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
       await reportRepo.saveReport(newReportData);
       setGeneratedReport(newReportData);
       await analyticsRepo.logEvent({ eventName: 'report_purchase', params: { reportId }, userId: profile.uid });
+      toast.success("Destiny Blueprint generated successfully!");
     } catch (e: unknown) { 
       const error = e as Error;
       console.error(error); 
-      alert("Failed: " + error.message); 
+      toast.error("Failed: " + error.message); 
     } finally { setLoading(false); }
   };
 
@@ -507,11 +530,11 @@ export default function ClientApp() {
           try {
             const userProfile = await userRepo.getUser(currentUser.uid);
             
-            const unsubscribeWallet = walletRepo.subscribeToWallet(currentUser.uid, (wallet) => {
+            walletRepo.subscribeToWallet(currentUser.uid, (wallet) => {
                 setWalletBalance(wallet?.balance || 0);
             });
             
-            const unsubscribeReport = reportRepo.subscribeToReport('rep_' + currentUser.uid, (report) => {
+            reportRepo.subscribeToReport('rep_' + currentUser.uid, (report) => {
                 setFullReport(report);
             });
   

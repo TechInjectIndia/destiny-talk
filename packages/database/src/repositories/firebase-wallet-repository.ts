@@ -1,11 +1,12 @@
 import { IWalletRepository, Wallet, WalletTransaction } from '@destiny-ai/core';
-import { doc, getDoc, setDoc, updateDoc, collection, query, limit, getDocs, onSnapshot, runTransaction, orderBy, where, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, limit, getDocs, onSnapshot, runTransaction, orderBy, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../client';
+import { FirestoreCollections } from '../collections';
 import { toDate } from './converters';
 
 export class FirebaseWalletRepository implements IWalletRepository {
   async getWallet(userId: string): Promise<Wallet | null> {
-    const snap = await getDoc(doc(db, 'wallet', userId));
+    const snap = await getDoc(doc(db, FirestoreCollections.WALLET, userId));
     if (!snap.exists()) return null;
     const data = snap.data();
     return {
@@ -16,7 +17,7 @@ export class FirebaseWalletRepository implements IWalletRepository {
   }
 
   async createWallet(userId: string): Promise<void> {
-    await setDoc(doc(db, 'wallet', userId), {
+    await setDoc(doc(db, FirestoreCollections.WALLET, userId), {
       balance: 0,
       updatedAt: serverTimestamp()
     });
@@ -24,7 +25,7 @@ export class FirebaseWalletRepository implements IWalletRepository {
 
   subscribeToWallet(userId: string, callback: (wallet: Wallet | null) => void): () => void {
     return onSnapshot(
-      doc(db, 'wallet', userId),
+      doc(db, FirestoreCollections.WALLET, userId),
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -45,7 +46,7 @@ export class FirebaseWalletRepository implements IWalletRepository {
   }
 
   async addTransaction(transaction: WalletTransaction): Promise<void> {
-    const ref = doc(collection(db, 'walletTransactions'));
+    const ref = doc(collection(db, FirestoreCollections.WALLET_TRANSACTIONS));
     await setDoc(ref, {
       ...transaction,
       timestamp: serverTimestamp()
@@ -54,7 +55,7 @@ export class FirebaseWalletRepository implements IWalletRepository {
 
   async getTransactions(userId: string, limitCount = 10): Promise<WalletTransaction[]> {
     const q = query(
-      collection(db, 'walletTransactions'), 
+      collection(db, FirestoreCollections.WALLET_TRANSACTIONS), 
       where('walletId', '==', userId), 
       orderBy('timestamp', 'desc'), 
       limit(limitCount)
@@ -69,7 +70,7 @@ export class FirebaseWalletRepository implements IWalletRepository {
 
   subscribeToTransactions(userId: string, limitCount = 10, callback: (transactions: WalletTransaction[]) => void): () => void {
     const q = query(
-      collection(db, 'walletTransactions'), 
+      collection(db, FirestoreCollections.WALLET_TRANSACTIONS), 
       where('walletId', '==', userId), 
       orderBy('timestamp', 'desc'), 
       limit(limitCount)
@@ -85,9 +86,9 @@ export class FirebaseWalletRepository implements IWalletRepository {
   }
 
   async processPaymentSuccess(userId: string, amount: number, orderId: string, description: string): Promise<void> {
-    const walletRef = doc(db, 'wallet', userId);
-    const txRef = doc(collection(db, 'walletTransactions'));
-    const orderRef = doc(db, 'orders', orderId);
+    const walletRef = doc(db, FirestoreCollections.WALLET, userId);
+    const txRef = doc(collection(db, FirestoreCollections.WALLET_TRANSACTIONS));
+    const orderRef = doc(db, FirestoreCollections.ORDERS, orderId);
 
     await runTransaction(db, async (t) => {
         const walletDoc = await t.get(walletRef);
@@ -111,8 +112,8 @@ export class FirebaseWalletRepository implements IWalletRepository {
   }
 
   async processPaymentDeduction(userId: string, amount: number, description: string, referenceId?: string): Promise<void> {
-    const walletRef = doc(db, 'wallet', userId);
-    const txRef = doc(collection(db, 'walletTransactions'));
+    const walletRef = doc(db, FirestoreCollections.WALLET, userId);
+    const txRef = doc(collection(db, FirestoreCollections.WALLET_TRANSACTIONS));
 
     await runTransaction(db, async (t) => {
        const walletDoc = await t.get(walletRef);

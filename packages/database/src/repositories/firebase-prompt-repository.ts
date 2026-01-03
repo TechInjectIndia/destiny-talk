@@ -1,15 +1,16 @@
 import { IPromptRepository, SystemPrompt } from '@destiny-ai/core';
 import { collection, query, where, orderBy, limit, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../client';
+import { FirestoreCollections } from '../collections';
 import { toDate } from './converters';
 
 export class FirebasePromptRepository implements IPromptRepository {
   async getPrompts(type?: 'report_gen' | 'chat_consultant'): Promise<SystemPrompt[]> {
     let q;
     if (type) {
-      q = query(collection(db, 'prompts'), where('type', '==', type), orderBy('createdAt', 'desc'));
+      q = query(collection(db, FirestoreCollections.PROMPTS), where('type', '==', type), orderBy('createdAt', 'desc'));
     } else {
-      q = query(collection(db, 'prompts'), orderBy('createdAt', 'desc'));
+      q = query(collection(db, FirestoreCollections.PROMPTS), orderBy('createdAt', 'desc'));
     }
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: toDate(d.data().createdAt) } as SystemPrompt));
@@ -17,7 +18,7 @@ export class FirebasePromptRepository implements IPromptRepository {
 
   async getActivePrompt(type: 'report_gen' | 'chat_consultant'): Promise<SystemPrompt | null> {
     const q = query(
-      collection(db, 'prompts'), 
+      collection(db, FirestoreCollections.PROMPTS), 
       where('type', '==', type), 
       where('isActive', '==', true), 
       limit(1)
@@ -29,7 +30,7 @@ export class FirebasePromptRepository implements IPromptRepository {
   }
 
   async savePrompt(prompt: Omit<SystemPrompt, 'id'>): Promise<string> {
-    const docRef = await addDoc(collection(db, 'prompts'), {
+    const docRef = await addDoc(collection(db, FirestoreCollections.PROMPTS), {
       ...prompt,
       createdAt: serverTimestamp()
     });
@@ -37,11 +38,11 @@ export class FirebasePromptRepository implements IPromptRepository {
   }
 
   async updatePrompt(id: string, data: Partial<SystemPrompt>): Promise<void> {
-    await updateDoc(doc(db, 'prompts', id), data);
+    await updateDoc(doc(db, FirestoreCollections.PROMPTS, id), data);
   }
 
   subscribeToPrompts(callback: (prompts: SystemPrompt[]) => void): () => void {
-    const q = query(collection(db, 'prompts'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, FirestoreCollections.PROMPTS), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => {
       callback(snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: toDate(d.data().createdAt) } as SystemPrompt)));
     });
@@ -49,7 +50,7 @@ export class FirebasePromptRepository implements IPromptRepository {
 
   subscribeToActivePrompt(type: 'report_gen' | 'chat_consultant', callback: (prompt: SystemPrompt | null) => void): () => void {
     const q = query(
-        collection(db, 'prompts'), 
+        collection(db, FirestoreCollections.PROMPTS), 
         where('type', '==', type), 
         where('isActive', '==', true), 
         limit(1)

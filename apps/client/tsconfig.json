@@ -31,8 +31,15 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@destiny-ai/core": ["../../packages/core/src/index.ts"],
+      "@destiny-ai/database": ["../../packages/database/src/index.ts"],
+      "@destiny-ai/database/*": ["../../packages/database/src/*.ts"],
+      "@destiny-ai/ui": ["../../packages/ui/index.tsx"],
+      "@destiny-ai/utils": ["../../packages/utils/analytics.ts"],
+      "@destiny-ai/utils/*": ["../../packages/utils/*.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

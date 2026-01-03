@@ -21,11 +21,11 @@ service cloud.firestore {
 
     // --- REPORTS ---
     match /reports/{reportId} {
-      // Allow read if document exists and user owns it, or if document doesn't exist (for initial reads)
+      // Allow read if document doesn't exist (for initial reads) or user owns it
       allow read: if !exists(/databases/$(database)/documents/reports/$(reportId)) || 
-                     resource.data.userId == request.auth.uid || 
+                     (resource != null && resource.data.userId == request.auth.uid) || 
                      isAuthenticated(); // Allow admin read
-      allow write: if request.auth.uid == request.resource.data.userId; 
+      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid; 
     }
 
     // --- WALLET ---
@@ -38,14 +38,18 @@ service cloud.firestore {
     // --- WALLET TRANSACTIONS ---
     // DEV NOTE: 'write' allowed for MVP demo. In Prod, set to 'false' (Admin only).
     match /walletTransactions/{txId} {
-      allow read: if resource.data.walletId == request.auth.uid || isAuthenticated(); // Allow admin read
-      allow write: if request.resource.data.walletId == request.auth.uid;
+      allow read: if !exists(/databases/$(database)/documents/walletTransactions/$(txId)) ||
+                     (resource != null && resource.data.walletId == request.auth.uid) ||
+                     isAuthenticated(); // Allow admin read
+      allow write: if isAuthenticated() && request.resource.data.walletId == request.auth.uid;
     }
 
     // --- CHATS ---
     match /chats/{chatId} {
-      allow read: if resource.data.userId == request.auth.uid || isAuthenticated();
-      allow write: if request.resource.data.userId == request.auth.uid;
+      allow read: if !exists(/databases/$(database)/documents/chats/$(chatId)) ||
+                     (resource != null && resource.data.userId == request.auth.uid) ||
+                     isAuthenticated();
+      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
     // --- CHAT MESSAGES ---
@@ -58,6 +62,27 @@ service cloud.firestore {
     match /prompts/{promptId} {
       // DEV NOTE: Open for demo admin
       allow read, write: if isAuthenticated();
+    }
+
+    // --- ORDERS ---
+    match /orders/{orderId} {
+      // Allow read if document doesn't exist, user owns it, or authenticated (for admin)
+      allow read: if !exists(/databases/$(database)/documents/orders/$(orderId)) ||
+                     (resource != null && resource.data.userId == request.auth.uid) ||
+                     isAuthenticated(); // Allow admin read
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Allow update if user owns it or authenticated (for admin)
+      allow update: if isAuthenticated() && (
+                      (resource != null && resource.data.userId == request.auth.uid) ||
+                      true // Allow admin update
+                    );
+    }
+
+    // --- ANALYTICS ---
+    match /analytics/{eventId} {
+      // Allow authenticated users to log events and read their own events
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { isConfigured, FirebasePromptRepository, FirebaseOrderRepository, FirebaseAnalyticsRepository, FirebaseUserRepository } from '@destiny-ai/database';
 import { SystemPrompt, Order, AnalyticsEvent, UserProfile } from '@destiny-ai/core';
 import { Button, Card, Input, TextArea } from '@destiny-ai/ui';
@@ -58,10 +59,11 @@ const AdminPromptManager = () => {
         });
         setIsEditing(false);
         setEditPrompt({});
+        toast.success("Prompt saved successfully!");
     } catch (e) {
         const error = e as Error;
         console.error(error);
-        alert("Failed to save prompt");
+        toast.error("Failed to save prompt");
     }
   };
 
@@ -221,7 +223,7 @@ const AdminUserInspector = () => {
                             <td style={{ padding: '8px' }}>{u.displayName}</td>
                             <td style={{ padding: '8px' }}>{u.email}</td>
                             <td style={{ padding: '8px' }}>{u.dobDay}/{u.dobMonth}/{u.dobYear}</td>
-                            <td style={{ padding: '8px' }}><Button variant="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px', width: 'auto' }} onClick={() => alert(`Viewing detailed logs for ${u.uid} (Coming Phase 3)`)}>Inspect</Button></td>
+                            <td style={{ padding: '8px' }}><Button variant="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px', width: 'auto' }} onClick={() => toast.info(`Viewing detailed logs for ${u.uid} (Coming Phase 3)`)}>Inspect</Button></td>
                         </tr>
                     ))}
                 </tbody>

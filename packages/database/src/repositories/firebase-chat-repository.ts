@@ -1,12 +1,13 @@
 import { IChatRepository, ChatMessage } from '@destiny-ai/core';
 import { collection, query, where, orderBy, limit, getDocs, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../client';
+import { FirestoreCollections } from '../collections';
 import { toDate } from './converters';
 
 export class FirebaseChatRepository implements IChatRepository {
   async getMessages(chatId: string, limitCount = 50): Promise<ChatMessage[]> {
     const q = query(
-      collection(db, 'chatMessages'), 
+      collection(db, FirestoreCollections.CHAT_MESSAGES), 
       where('chatId', '==', chatId), 
       orderBy('timestamp', 'asc'), 
       limit(limitCount)
@@ -20,7 +21,7 @@ export class FirebaseChatRepository implements IChatRepository {
   }
 
   async addMessage(message: ChatMessage): Promise<string> {
-    const docRef = await addDoc(collection(db, 'chatMessages'), {
+    const docRef = await addDoc(collection(db, FirestoreCollections.CHAT_MESSAGES), {
         ...message,
         timestamp: serverTimestamp()
     });
@@ -29,7 +30,7 @@ export class FirebaseChatRepository implements IChatRepository {
 
   subscribeToMessages(chatId: string, limitCount = 50, callback: (messages: ChatMessage[]) => void): () => void {
     const q = query(
-      collection(db, 'chatMessages'), 
+      collection(db, FirestoreCollections.CHAT_MESSAGES), 
       where('chatId', '==', chatId), 
       orderBy('timestamp', 'asc'), 
       limit(limitCount)

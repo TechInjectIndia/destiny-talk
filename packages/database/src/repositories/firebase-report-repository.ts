@@ -1,11 +1,12 @@
 import { IReportRepository, FullReport } from '@destiny-ai/core';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../client';
+import { FirestoreCollections } from '../collections';
 import { toDate } from './converters';
 
 export class FirebaseReportRepository implements IReportRepository {
   async getReport(reportId: string): Promise<FullReport | null> {
-    const snap = await getDoc(doc(db, 'reports', reportId));
+    const snap = await getDoc(doc(db, FirestoreCollections.REPORTS, reportId));
     if (!snap.exists()) return null;
     const data = snap.data();
     return {
@@ -18,7 +19,7 @@ export class FirebaseReportRepository implements IReportRepository {
   async saveReport(report: FullReport): Promise<void> {
     // reportId is usually passed or generated. 
     // In current app it's passed as 'rep_' + uid
-    await setDoc(doc(db, 'reports', report.reportId), {
+    await setDoc(doc(db, FirestoreCollections.REPORTS, report.reportId), {
       ...report,
       createdAt: report.createdAt ? report.createdAt : serverTimestamp() 
       // If createdAt is Date, Firestore converts it automatically if not using serverTimestamp
@@ -29,7 +30,7 @@ export class FirebaseReportRepository implements IReportRepository {
 
   subscribeToReport(reportId: string, callback: (report: FullReport | null) => void): () => void {
     return onSnapshot(
-      doc(db, 'reports', reportId),
+      doc(db, FirestoreCollections.REPORTS, reportId),
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();

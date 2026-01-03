@@ -20,12 +20,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolvePackageJsonExports": true,
     "resolvePackageJsonImports": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "outDir": "./dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
+
 
 
 
