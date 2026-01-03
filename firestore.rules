@@ -21,7 +21,10 @@ service cloud.firestore {
 
     // --- REPORTS ---
     match /reports/{reportId} {
-      allow read: if resource.data.userId == request.auth.uid || isAuthenticated(); // Allow admin read
+      // Allow read if document exists and user owns it, or if document doesn't exist (for initial reads)
+      allow read: if !exists(/databases/$(database)/documents/reports/$(reportId)) || 
+                     resource.data.userId == request.auth.uid || 
+                     isAuthenticated(); // Allow admin read
       allow write: if request.auth.uid == request.resource.data.userId; 
     }
 

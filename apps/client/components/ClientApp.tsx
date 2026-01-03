@@ -148,9 +148,13 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
       const userRef = doc(db, 'users', user.uid);
       const walletRef = doc(db, 'wallet', user.uid);
       await runTransaction(db, async (t) => {
-        t.set(userRef, { ...formData, uid: user.uid, createdAt: serverTimestamp() }, { merge: true });
+        // All reads must come before writes
         const walletDoc = await t.get(walletRef);
-        if (!walletDoc.exists()) t.set(walletRef, { balance: 0, updatedAt: serverTimestamp() });
+        // Now perform all writes
+        t.set(userRef, { ...formData, uid: user.uid, createdAt: serverTimestamp() }, { merge: true });
+        if (!walletDoc.exists()) {
+          t.set(walletRef, { balance: 0, updatedAt: serverTimestamp() });
+        }
       });
       await logEvent('onboarding_complete', { uid: user.uid }, user.uid);
       onComplete();
@@ -183,7 +187,16 @@ const WalletView = ({ userId }: { userId: string }) => {
   useEffect(() => {
     if (!isConfigured) return;
     const q = query(collection(db, 'walletTransactions'), where('walletId', '==', userId), orderBy('timestamp', 'desc'), limit(10));
-    const unsubscribe = onSnapshot(q, (snapshot) => { setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WalletTransaction[]); });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WalletTransaction[]);
+      },
+      (error) => {
+        console.warn('Wallet transactions snapshot error:', error);
+        setTransactions([]);
+      }
+    );
     return () => unsubscribe();
   }, [userId]);
 
@@ -285,12 +298,19 @@ const useSystemPrompt = (type: 'report_gen' | 'chat_consultant') => {
         limit(1)
       );
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setPromptContent(data.content as string);
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            setPromptContent(data.content as string);
+          }
+        },
+        (error) => {
+          console.warn('System prompt snapshot error:', error);
+          // Keep default prompt on error
         }
-      });
+      );
       return () => unsubscribe();
     }, [type]);
   
@@ -311,10 +331,17 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
   useEffect(() => {
     if (!isConfigured) return;
     const q = query(collection(db, 'chatMessages'), where('chatId', '==', chatId), orderBy('timestamp', 'asc'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChatMessage[]);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChatMessage[]);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      },
+      (error) => {
+        console.warn('Chat messages snapshot error:', error);
+        setMessages([]);
+      }
+    );
     return () => unsubscribe();
   }, [chatId]);
 
@@ -597,16 +624,52 @@ export default function ClientApp() {
       const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
-          const docSnap = await getDoc(doc(db, 'users', currentUser.uid));
-          onSnapshot(doc(db, 'wallet', currentUser.uid), (snap) => setWalletBalance(snap.exists() ? snap.data()?.balance || 0 : 0));
-          onSnapshot(doc(db, 'reports', 'rep_' + currentUser.uid), (snap) => { if (snap.exists()) setFullReport(snap.data() as FullReport); });
+          try {
+            const docSnap = await getDoc(doc(db, 'users', currentUser.uid));
+            
+            // Set up wallet snapshot with error handling
+            onSnapshot(
+              doc(db, 'wallet', currentUser.uid),
+              (snap) => {
+                setWalletBalance(snap.exists() ? snap.data()?.balance || 0 : 0);
+              },
+              (error) => {
+                console.warn('Wallet snapshot error:', error);
+                setWalletBalance(0);
+              }
+            );
+            
+            // Set up reports snapshot with error handling
+            onSnapshot(
+              doc(db, 'reports', 'rep_' + currentUser.uid),
+              (snap) => {
+                if (snap.exists()) {
+                  setFullReport(snap.data() as FullReport);
+                } else {
+                  setFullReport(null);
+                }
+              },
+              (error) => {
+                // Report doesn't exist yet, which is fine
+                console.warn('Report snapshot error (may not exist yet):', error);
+                setFullReport(null);
+              }
+            );
   
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            setProfile(data);
-            if (data.dobDay) setCoreNumbers(generateNumerologyProfile(parseInt(data.dobDay), parseInt(data.dobMonth), parseInt(data.dobYear), data.gender));
-            logEvent('app_open', {}, currentUser.uid);
-          } else setProfile(null);
+            if (docSnap.exists()) {
+              const data = docSnap.data() as UserProfile;
+              setProfile(data);
+              if (data.dobDay) setCoreNumbers(generateNumerologyProfile(parseInt(data.dobDay), parseInt(data.dobMonth), parseInt(data.dobYear), data.gender));
+              logEvent('app_open', {}, currentUser.uid).catch(err => console.warn('Analytics error:', err));
+            } else {
+              setProfile(null);
+            }
+          } catch (error) {
+            console.error('Error loading user data:', error);
+            setProfile(null);
+            setWalletBalance(0);
+            setFullReport(null);
+          }
         } else {
           setProfile(null); setCoreNumbers(null); setFullReport(null); setWalletBalance(0);
         }
