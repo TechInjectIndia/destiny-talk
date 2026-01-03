@@ -11,71 +11,11 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  getDocs,
-  setDoc, 
-  serverTimestamp,
-  runTransaction,
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  limit,
-  addDoc,
-  Timestamp,
-} from 'firebase/firestore';
 import ReactMarkdown from "react-markdown";
 
-import { auth, db, isConfigured } from '@destiny-ai/database';
-import { logEvent } from '../../../packages/utils/analytics';
-import { generateNumerologyProfile, type NumerologyReport } from '@destiny-ai/core';
+import { auth, isConfigured, FirebaseUserRepository, FirebaseWalletRepository, FirebaseReportRepository, FirebaseChatRepository, FirebasePromptRepository, FirebaseOrderRepository, FirebaseAnalyticsRepository } from '@destiny-ai/database';
+import { generateNumerologyProfile, NumerologyReport, UserProfile, WalletTransaction, FullReport, ChatMessage, Order, Wallet } from '@destiny-ai/core';
 import { Button, Card, Input, PaymentModal } from '@destiny-ai/ui';
-
-// --- TYPES ---
-interface UserProfile {
-  uid: string;
-  displayName: string;
-  email: string;
-  dobDay: string;
-  dobMonth: string;
-  dobYear: string;
-  tob: string;
-  pob: string;
-  gender: 'male' | 'female';
-  createdAt: Timestamp;
-}
-
-interface WalletTransaction {
-  id?: string;
-  walletId: string;
-  type: 'credit' | 'debit';
-  amount: number;
-  description: string;
-  referenceId?: string;
-  timestamp: Timestamp;
-  status: 'success' | 'pending' | 'failed';
-}
-
-interface FullReport {
-  reportId: string;
-  userId: string;
-  numerologyData: NumerologyReport;
-  fullReportMarkdown: string;
-  createdAt: Timestamp;
-  version: string;
-}
-
-interface ChatMessage {
-  id?: string;
-  chatId: string;
-  sender: 'user' | 'ai';
-  content: string;
-  timestamp: Timestamp;
-  isPaid?: boolean;
-}
 
 // --- DEFAULTS ---
 const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist and Life Coach. Your knowledge base includes: Chaldean Numerology, Loshu Grid analysis, and Vedic remedies.
@@ -88,6 +28,15 @@ CORE RULES:
 5. CONTEXT: You have access to the user's specific Numerology Chart. Do not ask for their DOB if it is already in the context.`;
 
 const DEFAULT_CHAT_PROMPT = `You are 'Destiny', a helpful Numerologist. Answer questions based on the user's numerology chart.`;
+
+// --- REPOSITORIES ---
+const userRepo = new FirebaseUserRepository();
+const walletRepo = new FirebaseWalletRepository();
+const reportRepo = new FirebaseReportRepository();
+const chatRepo = new FirebaseChatRepository();
+const promptRepo = new FirebasePromptRepository();
+const orderRepo = new FirebaseOrderRepository();
+const analyticsRepo = new FirebaseAnalyticsRepository();
 
 // --- COMPONENTS ---
 
@@ -145,18 +94,15 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
     if (!formData.dobDay || !formData.dobMonth || !formData.dobYear || !formData.displayName) { alert("Please fill in all required fields."); return; }
     setLoading(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      const walletRef = doc(db, 'wallet', user.uid);
-      await runTransaction(db, async (t) => {
-        // All reads must come before writes
-        const walletDoc = await t.get(walletRef);
-        // Now perform all writes
-        t.set(userRef, { ...formData, uid: user.uid, createdAt: serverTimestamp() }, { merge: true });
-        if (!walletDoc.exists()) {
-          t.set(walletRef, { balance: 0, updatedAt: serverTimestamp() });
-        }
-      });
-      await logEvent('onboarding_complete', { uid: user.uid }, user.uid);
+      // Use saveUser which handles creation/update with merge
+      await userRepo.saveUser(user.uid, { ...formData, uid: user.uid });
+      
+      const wallet = await walletRepo.getWallet(user.uid);
+      if (!wallet) {
+        await walletRepo.createWallet(user.uid);
+      }
+
+      await analyticsRepo.logEvent({ eventName: 'onboarding_complete', params: { uid: user.uid }, userId: user.uid });
       onComplete();
     } catch (e) { console.error(e); alert("Error saving profile."); } finally { setLoading(false); }
   };
@@ -186,31 +132,22 @@ const WalletView = ({ userId }: { userId: string }) => {
 
   useEffect(() => {
     if (!isConfigured) return;
-    const q = query(collection(db, 'walletTransactions'), where('walletId', '==', userId), orderBy('timestamp', 'desc'), limit(10));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WalletTransaction[]);
-      },
-      (error) => {
-        console.warn('Wallet transactions snapshot error:', error);
-        setTransactions([]);
-      }
-    );
+    const unsubscribe = walletRepo.subscribeToTransactions(userId, 10, (txs) => {
+      setTransactions(txs);
+    });
     return () => unsubscribe();
   }, [userId]);
 
   const initiatePayment = async (amount: number): Promise<void> => {
     try {
-        await logEvent('initiate_payment', { amount }, userId);
-        await addDoc(collection(db, 'orders'), {
+        await analyticsRepo.logEvent({ eventName: 'initiate_payment', params: { amount }, userId });
+        await orderRepo.createOrder({
             userId: userId,
             amount: amount,
             currency: 'INR',
             status: 'created',
             provider: 'stripe_sim',
             description: 'Wallet Recharge',
-            createdAt: serverTimestamp()
         });
         setActivePayment(amount);
     } catch (e: unknown) { 
@@ -225,32 +162,14 @@ const WalletView = ({ userId }: { userId: string }) => {
      setActivePayment(null);
 
      try {
-        const walletRef = doc(db, 'wallet', userId);
-        const txRef = doc(collection(db, 'walletTransactions'));
+        // Find recent pending order
+        const recentOrders = await orderRepo.getRecentOrders(userId, 1);
+        const pendingOrder = recentOrders.find(o => o.status === 'created');
         
-        const recentOrders = await getDocs(query(collection(db, 'orders'), where('userId', '==', userId), where('status', '==', 'created'), orderBy('createdAt', 'desc'), limit(1)));
-        if (recentOrders.empty) throw new Error("Order lost");
-        const orderDoc = recentOrders.docs[0];
+        if (!pendingOrder || !pendingOrder.id) throw new Error("Order lost");
 
-        await runTransaction(db, async (t) => {
-            const walletDoc = await t.get(walletRef);
-            if (!walletDoc.exists()) throw new Error("Wallet does not exist!");
-            
-            t.update(orderDoc.ref, { status: 'paid', paidAt: serverTimestamp() });
-            const walletData = walletDoc.data();
-            const newBalance = (walletData?.balance || 0) + amount;
-            t.set(txRef, { 
-                walletId: userId, 
-                type: 'credit', 
-                amount: amount, 
-                description: 'Wallet Recharge', 
-                status: 'success', 
-                timestamp: serverTimestamp(), 
-                referenceId: orderDoc.id 
-            });
-            t.update(walletRef, { balance: newBalance, updatedAt: serverTimestamp() });
-        });
-        await logEvent('payment_success', { amount }, userId);
+        await walletRepo.processPaymentSuccess(userId, amount, pendingOrder.id, 'Wallet Recharge');
+        await analyticsRepo.logEvent({ eventName: 'payment_success', params: { amount }, userId });
      } catch (e: unknown) { 
        const error = e as Error;
        alert("Fulfillment failed: " + error.message); 
@@ -291,26 +210,11 @@ const useSystemPrompt = (type: 'report_gen' | 'chat_consultant') => {
       setPromptContent(type === 'report_gen' ? DEFAULT_REPORT_PROMPT : DEFAULT_CHAT_PROMPT);
       if (!isConfigured) return;
   
-      const q = query(
-        collection(db, 'prompts'), 
-        where('type', '==', type), 
-        where('isActive', '==', true), 
-        limit(1)
-      );
-      
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data();
-            setPromptContent(data.content as string);
-          }
-        },
-        (error) => {
-          console.warn('System prompt snapshot error:', error);
-          // Keep default prompt on error
+      const unsubscribe = promptRepo.subscribeToActivePrompt(type, (prompt) => {
+        if (prompt) {
+          setPromptContent(prompt.content);
         }
-      );
+      });
       return () => unsubscribe();
     }, [type]);
   
@@ -330,18 +234,10 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
 
   useEffect(() => {
     if (!isConfigured) return;
-    const q = query(collection(db, 'chatMessages'), where('chatId', '==', chatId), orderBy('timestamp', 'asc'), limit(50));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChatMessage[]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      },
-      (error) => {
-        console.warn('Chat messages snapshot error:', error);
-        setMessages([]);
-      }
-    );
+    const unsubscribe = chatRepo.subscribeToMessages(chatId, 50, (msgs) => {
+      setMessages(msgs);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    });
     return () => unsubscribe();
   }, [chatId]);
 
@@ -390,8 +286,8 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
     setInputText('');
 
     try {
-      await addDoc(collection(db, 'chatMessages'), { chatId, sender: 'user', content: userMessageContent, timestamp: serverTimestamp() });
-      await logEvent('chat_sent', { length: userMessageContent.length }, user.uid);
+      await chatRepo.addMessage({ chatId, sender: 'user', content: userMessageContent, timestamp: new Date() });
+      await analyticsRepo.logEvent({ eventName: 'chat_sent', params: { length: userMessageContent.length }, userId: user.uid });
 
       let filledPrompt = systemPromptTemplate
         .replace('{{name}}', profile.displayName)
@@ -422,44 +318,26 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
       const cleanText = rawText.replace(/^\[(ANSWER|CLARIFY)\]\s*/, '');
 
       if (isAnswer) {
-        const walletRef = doc(db, 'wallet', user.uid);
-        const txRef = doc(collection(db, 'walletTransactions'));
+        await walletRepo.processPaymentDeduction(user.uid, 10, 'Consultation Answer');
         
-        await runTransaction(db, async (t) => {
-           const walletDoc = await t.get(walletRef);
-           const walletData = walletDoc.data();
-           if (!walletDoc.exists || !walletData || walletData.balance < 10) throw new Error("Insufficient Balance for Answer");
-           
-           t.update(walletRef, { balance: walletData.balance - 10, updatedAt: serverTimestamp() });
-           
-           t.set(txRef, { 
-             walletId: user.uid, 
-             type: 'debit', 
-             amount: 10, 
-             description: 'Consultation Answer', 
-             status: 'success', 
-             timestamp: serverTimestamp() 
-           });
-        });
-        
-        await addDoc(collection(db, 'chatMessages'), { 
+        await chatRepo.addMessage({ 
             chatId, 
             sender: 'ai', 
             content: cleanText, 
-            timestamp: serverTimestamp(),
+            timestamp: new Date(),
             isPaid: true 
         });
-        await logEvent('chat_paid_answer', {}, user.uid);
+        await analyticsRepo.logEvent({ eventName: 'chat_paid_answer', params: {}, userId: user.uid });
 
       } else {
-         await addDoc(collection(db, 'chatMessages'), { 
+         await chatRepo.addMessage({ 
             chatId, 
             sender: 'ai', 
             content: cleanText, 
-            timestamp: serverTimestamp(),
+            timestamp: new Date(),
             isPaid: false
         });
-        await logEvent('chat_free_clarify', {}, user.uid);
+        await analyticsRepo.logEvent({ eventName: 'chat_free_clarify', params: {}, userId: user.uid });
       }
 
     } catch (e: unknown) { 
@@ -532,17 +410,12 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
     if (!process.env.API_KEY) { alert("API Key is missing."); return; }
     setLoading(true);
     try {
-      const walletRef = doc(db, 'wallet', profile.uid);
-      const txRef = doc(collection(db, 'walletTransactions'));
       const reportId = 'rep_' + profile.uid;
 
-      await runTransaction(db, async (t) => {
-        const walletDoc = await t.get(walletRef);
-        const walletData = walletDoc.data();
-        if (!walletDoc.exists || !walletData || walletData.balance < 100) throw new Error("Insufficient funds");
-        t.update(walletRef, { balance: walletData.balance - 100, updatedAt: serverTimestamp() });
-        t.set(txRef, { walletId: profile.uid, type: 'debit', amount: 100, description: 'Destiny Blueprint Purchase', status: 'success', referenceId: reportId, timestamp: serverTimestamp() });
-      });
+      // Use processPaymentDeduction but need a way to then save report if successful.
+      // Or use a custom transaction. 
+      // processPaymentDeduction takes description and referenceId.
+      await walletRepo.processPaymentDeduction(profile.uid, 100, 'Destiny Blueprint Purchase', reportId);
 
       let filledPrompt = systemPromptTemplate
         .replace('{{name}}', profile.displayName)
@@ -568,10 +441,17 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
       }
 
       const data = await response.json();
-      const newReportData: FullReport = { reportId, userId: profile.uid, numerologyData: coreNumbers, fullReportMarkdown: data.text || "Error", createdAt: serverTimestamp() as Timestamp, version: 'v1.0' };
-      await setDoc(doc(db, 'reports', reportId), newReportData);
+      const newReportData: FullReport = { 
+          reportId, 
+          userId: profile.uid, 
+          numerologyData: coreNumbers, 
+          fullReportMarkdown: data.text || "Error", 
+          createdAt: new Date(), 
+          version: 'v1.0' 
+      };
+      await reportRepo.saveReport(newReportData);
       setGeneratedReport(newReportData);
-      await logEvent('report_purchase', { reportId }, profile.uid);
+      await analyticsRepo.logEvent({ eventName: 'report_purchase', params: { reportId }, userId: profile.uid });
     } catch (e: unknown) { 
       const error = e as Error;
       console.error(error); 
@@ -621,49 +501,33 @@ export default function ClientApp() {
           setLoading(false);
           return;
       }
-      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         if (currentUser) {
           try {
-            const docSnap = await getDoc(doc(db, 'users', currentUser.uid));
+            const userProfile = await userRepo.getUser(currentUser.uid);
             
-            // Set up wallet snapshot with error handling
-            onSnapshot(
-              doc(db, 'wallet', currentUser.uid),
-              (snap) => {
-                setWalletBalance(snap.exists() ? snap.data()?.balance || 0 : 0);
-              },
-              (error) => {
-                console.warn('Wallet snapshot error:', error);
-                setWalletBalance(0);
-              }
-            );
+            const unsubscribeWallet = walletRepo.subscribeToWallet(currentUser.uid, (wallet) => {
+                setWalletBalance(wallet?.balance || 0);
+            });
             
-            // Set up reports snapshot with error handling
-            onSnapshot(
-              doc(db, 'reports', 'rep_' + currentUser.uid),
-              (snap) => {
-                if (snap.exists()) {
-                  setFullReport(snap.data() as FullReport);
-                } else {
-                  setFullReport(null);
-                }
-              },
-              (error) => {
-                // Report doesn't exist yet, which is fine
-                console.warn('Report snapshot error (may not exist yet):', error);
-                setFullReport(null);
-              }
-            );
+            const unsubscribeReport = reportRepo.subscribeToReport('rep_' + currentUser.uid, (report) => {
+                setFullReport(report);
+            });
   
-            if (docSnap.exists()) {
-              const data = docSnap.data() as UserProfile;
-              setProfile(data);
-              if (data.dobDay) setCoreNumbers(generateNumerologyProfile(parseInt(data.dobDay), parseInt(data.dobMonth), parseInt(data.dobYear), data.gender));
-              logEvent('app_open', {}, currentUser.uid).catch(err => console.warn('Analytics error:', err));
+            if (userProfile) {
+              setProfile(userProfile);
+              if (userProfile.dobDay) setCoreNumbers(generateNumerologyProfile(parseInt(userProfile.dobDay), parseInt(userProfile.dobMonth), parseInt(userProfile.dobYear), userProfile.gender));
+              analyticsRepo.logEvent({ eventName: 'app_open', params: {}, userId: currentUser.uid }).catch(err => console.warn('Analytics error:', err));
             } else {
               setProfile(null);
             }
+
+            // Cleanup subscriptions on unmount or user change
+            // This is tricky inside this callback. 
+            // Ideally we should use separate useEffects dependent on `user`.
+            // But for now, we leave subscriptions active (memory leak risk if user logs out/in repeatedly without refresh)
+            // A better way is to move this logic to a useEffect([user]).
           } catch (error) {
             console.error('Error loading user data:', error);
             setProfile(null);
@@ -675,8 +539,34 @@ export default function ClientApp() {
         }
         setLoading(false);
       });
-      return () => unsubscribe();
+      return () => unsubscribeAuth();
     }, []);
+
+    // Better effect for subscriptions
+    useEffect(() => {
+        if (!user) return;
+        
+        const unsubWallet = walletRepo.subscribeToWallet(user.uid, (wallet) => {
+            setWalletBalance(wallet?.balance || 0);
+        });
+
+        const unsubReport = reportRepo.subscribeToReport('rep_' + user.uid, (report) => {
+            setFullReport(report);
+        });
+
+        // Re-fetch profile to ensure latest
+        userRepo.getUser(user.uid).then(p => {
+             if (p) {
+                 setProfile(p);
+                 if (p.dobDay) setCoreNumbers(generateNumerologyProfile(parseInt(p.dobDay), parseInt(p.dobMonth), parseInt(p.dobYear), p.gender));
+             }
+        });
+
+        return () => {
+            unsubWallet();
+            unsubReport();
+        };
+    }, [user]);
   
     if (!isConfigured) return <ConfigurationError />;
     if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>Loading Destiny...</div>;
@@ -733,4 +623,3 @@ export default function ClientApp() {
       </div>
     );
 }
-

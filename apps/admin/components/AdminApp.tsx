@@ -1,52 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, limit, Timestamp, getDocs } from 'firebase/firestore';
-import { db, isConfigured } from '@destiny-ai/database';
+import { isConfigured, FirebasePromptRepository, FirebaseOrderRepository, FirebaseAnalyticsRepository, FirebaseUserRepository } from '@destiny-ai/database';
+import { SystemPrompt, Order, AnalyticsEvent, UserProfile } from '@destiny-ai/core';
 import { Button, Card, Input, TextArea } from '@destiny-ai/ui';
 
-// --- TYPES ---
-
-interface SystemPrompt {
-  id?: string;
-  type: 'report_gen' | 'chat_consultant';
-  version: string;
-  content: string;
-  isActive: boolean;
-  createdAt: Timestamp;
-}
-
-interface Order {
-  id?: string;
-  userId: string;
-  amount: number;
-  currency: string;
-  status: 'created' | 'paid' | 'failed';
-  provider: 'stripe_sim' | 'razorpay_sim';
-  createdAt: Timestamp;
-  description: string;
-}
-
-interface AnalyticsEvent {
-  id?: string;
-  eventName: string;
-  userId?: string;
-  params: Record<string, unknown>;
-  timestamp: Timestamp;
-}
-
-interface UserProfile {
-    uid: string;
-    displayName: string;
-    email: string;
-    dobDay: string;
-    dobMonth: string;
-    dobYear: string;
-    tob: string;
-    pob: string;
-    gender: 'male' | 'female';
-    createdAt: Timestamp;
-  }
+// --- REPOSITORIES ---
+const promptRepo = new FirebasePromptRepository();
+const orderRepo = new FirebaseOrderRepository();
+const analyticsRepo = new FirebaseAnalyticsRepository();
+const userRepo = new FirebaseUserRepository();
 
 // --- DEFAULTS ---
 const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist and Life Coach. Your knowledge base includes: Chaldean Numerology, Loshu Grid analysis, and Vedic remedies.
@@ -71,9 +34,8 @@ const AdminPromptManager = () => {
 
   useEffect(() => {
     if (!isConfigured) return;
-    const q = query(collection(db, 'prompts'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })) as SystemPrompt[]);
+    const unsubscribe = promptRepo.subscribeToPrompts((data) => {
+      setPrompts(data);
     });
     return () => unsubscribe();
   }, []);
@@ -84,15 +46,15 @@ const AdminPromptManager = () => {
         if (editPrompt.isActive) {
             const others = prompts.filter(p => p.type === editPrompt.type && p.isActive);
             for (const p of others) {
-                if (p.id) await updateDoc(doc(db, 'prompts', p.id), { isActive: false });
+                if (p.id) await promptRepo.updatePrompt(p.id, { isActive: false });
             }
         }
-        await addDoc(collection(db, 'prompts'), {
+        await promptRepo.savePrompt({
             type: editPrompt.type || typeFilter,
             version: editPrompt.version,
             content: editPrompt.content,
             isActive: editPrompt.isActive || false,
-            createdAt: serverTimestamp()
+            createdAt: new Date()
         });
         setIsEditing(false);
         setEditPrompt({});
@@ -146,9 +108,7 @@ const AdminFinance = () => {
 
     useEffect(() => {
         if (!isConfigured) return;
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+        const unsubscribe = orderRepo.subscribeToOrders(50, (data) => {
             setOrders(data);
             const revenue = data.filter(o => o.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
             setTotalRevenue(revenue);
@@ -210,9 +170,7 @@ const AdminAnalytics = () => {
 
   useEffect(() => {
     if (!isConfigured) return;
-    const q = query(collection(db, 'analytics'), orderBy('timestamp', 'desc'), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AnalyticsEvent[];
+    const unsubscribe = analyticsRepo.subscribeToEvents(100, (data) => {
       setEvents(data);
       setMetrics({
         opens: data.filter(e => e.eventName === 'app_open').length,
@@ -234,7 +192,7 @@ const AdminAnalytics = () => {
       <div style={{ background: '#000', color: '#0f0', padding: '20px', borderRadius: '8px', maxHeight: '300px', overflowY: 'auto', fontFamily: 'monospace' }}>
         {events.map(e => (
           <div key={e.id} style={{ marginBottom: '4px' }}>
-            <span style={{ color: '#666' }}>[{e.timestamp?.toDate().toLocaleTimeString()}]</span> {e.eventName} <span style={{ color: '#fff' }}>{JSON.stringify(e.params)}</span>
+            <span style={{ color: '#666' }}>[{e.timestamp?.toLocaleTimeString()}]</span> {e.eventName} <span style={{ color: '#fff' }}>{JSON.stringify(e.params)}</span>
           </div>
         ))}
       </div>
@@ -247,8 +205,8 @@ const AdminUserInspector = () => {
     useEffect(() => {
         if (!isConfigured) return;
         const fetchUsers = async () => {
-            const snap = await getDocs(query(collection(db, 'users'), limit(20)));
-            setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[]);
+            const data = await userRepo.listUsers(20);
+            setUsers(data);
         };
         fetchUsers();
     }, []);
@@ -300,4 +258,3 @@ export default function AdminApp() {
         </div>
     );
 }
-
