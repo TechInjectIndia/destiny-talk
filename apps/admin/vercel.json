@@ -1,0 +1,7 @@
+{
+  "buildCommand": "turbo build --filter=admin",
+  "installCommand": "bun install",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
+}
+  

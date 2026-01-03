@@ -1,0 +1,33 @@
+{
+  "name": "@destiny-ai/utils",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./analytics.ts",
+  "types": "./analytics.ts",
+  "exports": {
+    ".": {
+      "import": "./analytics.ts",
+      "types": "./analytics.ts"
+    },
+    "./analytics": {
+      "import": "./analytics.ts",
+      "types": "./analytics.ts"
+    },
+    "./ai": {
+      "import": "./ai.ts",
+      "types": "./ai.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint *.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase": "^11.0.0",
+    "@destiny-ai/database": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
+

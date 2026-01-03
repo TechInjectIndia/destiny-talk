@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, limit, Timestamp, getDocs } from 'firebase/firestore';
 import { db, isConfigured } from '@destiny-ai/database';
@@ -47,8 +49,16 @@ interface UserProfile {
   }
 
 // --- DEFAULTS ---
-const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist and Life Coach... (Truncated for brevity, normally full prompt)`;
-const DEFAULT_CHAT_PROMPT = `You are 'Destiny', a helpful Numerologist... (Truncated for brevity)`;
+const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist and Life Coach. Your knowledge base includes: Chaldean Numerology, Loshu Grid analysis, and Vedic remedies.
+
+CORE RULES:
+1. ACCURACY: Never miscalculate Core Numbers (Moolank/Bhagyank).
+2. TONE: Empathetic, professional, yet mystical. Avoid "woo-woo" language; use grounded explanations.
+3. STRUCTURE: Use Markdown. Use bolding for key terms.
+4. BOUNDARIES: If a user asks about medical diagnosis, legal verdicts, or lottery numbers, politely refuse citing ethical guidelines.
+5. CONTEXT: You have access to the user's specific Numerology Chart. Do not ask for their DOB if it is already in the context.`;
+
+const DEFAULT_CHAT_PROMPT = `You are 'Destiny', a helpful Numerologist. Answer questions based on the user's numerology chart.`;
 
 
 // --- COMPONENTS ---
@@ -87,7 +97,8 @@ const AdminPromptManager = () => {
         setIsEditing(false);
         setEditPrompt({});
     } catch (e) {
-        console.error(e);
+        const error = e as Error;
+        console.error(error);
         alert("Failed to save prompt");
     }
   };
@@ -145,6 +156,9 @@ const AdminFinance = () => {
         return () => unsubscribe();
     }, []);
 
+    const paidOrders = orders.filter(o => o.status === 'paid');
+    const avgOrderValue = paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0;
+
     return (
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -152,7 +166,7 @@ const AdminFinance = () => {
                     <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'green' }}>₹{totalRevenue}</div>
                 </Card>
                 <Card title="Avg Order Value">
-                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{orders.length > 0 ? Math.round(totalRevenue / orders.filter(o => o.status === 'paid').length) : 0}</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>₹{avgOrderValue}</div>
                 </Card>
             </div>
             <h3>Recent Orders</h3>
@@ -188,7 +202,7 @@ const AdminFinance = () => {
             </table>
         </div>
     );
-}
+};
 
 const AdminAnalytics = () => {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
@@ -285,4 +299,5 @@ export default function AdminApp() {
             </div>
         </div>
     );
-};
+}
+

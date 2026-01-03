@@ -1,0 +1,6 @@
+{
+  "buildCommand": "turbo build --filter=client",
+  "installCommand": "bun install",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
+}

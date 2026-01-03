@@ -10,14 +10,6 @@ export const reduceToSingleDigit = (n: number): number => {
   return (n - 1) % 9 + 1;
 };
 
-// Helper: Sums digits of a number without full reduction (needed for intermediate steps sometimes).
-// Example: 1990 -> 19
-const sumDigitsRaw = (n: number): number => {
-  return n
-    .toString()
-    .split('')
-    .reduce((acc, curr) => acc + parseInt(curr), 0);
-};
 
 // --- CORE CALCULATORS ---
 

@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -27,9 +30,8 @@ import {
 import ReactMarkdown from "react-markdown";
 
 import { auth, db, isConfigured } from '@destiny-ai/database';
-import { ai } from '@destiny-ai/utils/ai';
-import { logEvent } from '@destiny-ai/utils/analytics';
-import { generateNumerologyProfile, NumerologyReport } from '@destiny-ai/core';
+import { logEvent } from '../../../packages/utils/analytics';
+import { generateNumerologyProfile, type NumerologyReport } from '@destiny-ai/core';
 import { Button, Card, Input, PaymentModal } from '@destiny-ai/ui';
 
 // --- TYPES ---
@@ -76,8 +78,16 @@ interface ChatMessage {
 }
 
 // --- DEFAULTS ---
-const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist... (Using default if DB unavailable)`;
-const DEFAULT_CHAT_PROMPT = `You are 'Destiny', a helpful Numerologist...`;
+const DEFAULT_REPORT_PROMPT = `You are 'Destiny', a world-class Senior Numerologist and Life Coach. Your knowledge base includes: Chaldean Numerology, Loshu Grid analysis, and Vedic remedies.
+
+CORE RULES:
+1. ACCURACY: Never miscalculate Core Numbers (Moolank/Bhagyank).
+2. TONE: Empathetic, professional, yet mystical. Avoid "woo-woo" language; use grounded explanations.
+3. STRUCTURE: Use Markdown. Use bolding for key terms.
+4. BOUNDARIES: If a user asks about medical diagnosis, legal verdicts, or lottery numbers, politely refuse citing ethical guidelines.
+5. CONTEXT: You have access to the user's specific Numerology Chart. Do not ask for their DOB if it is already in the context.`;
+
+const DEFAULT_CHAT_PROMPT = `You are 'Destiny', a helpful Numerologist. Answer questions based on the user's numerology chart.`;
 
 // --- COMPONENTS ---
 
@@ -93,14 +103,20 @@ const AuthScreen = ({ onLogin }: { onLogin: () => void }) => {
       if (isSignUp) await createUserWithEmailAndPassword(auth, email, password);
       else await signInWithEmailAndPassword(auth, email, password);
       onLogin(); 
-    } catch (err: any) { setError(err.message); }
+    } catch (err: unknown) { 
+      const error = err as Error;
+      setError(error.message); 
+    }
   };
 
   const handleGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (err: any) { setError(err.message); }
+    } catch (err: unknown) { 
+      const error = err as Error;
+      setError(error.message); 
+    }
   };
 
   return (
@@ -151,8 +167,8 @@ const OnboardingScreen = ({ user, onComplete }: { user: User, onComplete: () => 
           <Input label="Month" value={formData.dobMonth} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dobMonth: e.target.value})} placeholder="MM" type="number" />
           <Input label="Year" value={formData.dobYear} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dobYear: e.target.value})} placeholder="YYYY" type="number" />
         </div>
-        <Input label="Time of Birth (Optional)" value={formData.tob} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, tob: e.target.value})} placeholder="HH:MM AM/PM" />
-        <Input label="Place of Birth" value={formData.pob} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, pob: e.target.value})} placeholder="City, Country" />
+        <Input label="Time of Birth (Optional)" value={formData.tob || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, tob: e.target.value})} placeholder="HH:MM AM/PM" />
+        <Input label="Place of Birth" value={formData.pob || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, pob: e.target.value})} placeholder="City, Country" />
         <div style={{ marginBottom: '20px' }}><label style={{ display: 'block', marginBottom: '4px', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>Gender</label><select value={formData.gender} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value as 'male' | 'female'})} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}><option value="male">Male</option><option value="female">Female</option></select></div>
         <Button onClick={handleSubmit} disabled={loading}>{loading ? "Saving..." : "Complete Profile"}</Button>
       </Card>
@@ -184,8 +200,9 @@ const WalletView = ({ userId }: { userId: string }) => {
             createdAt: serverTimestamp()
         });
         setActivePayment(amount);
-    } catch (e: any) { 
-        alert("Failed to start payment: " + e.message);
+    } catch (e: unknown) { 
+      const error = e as Error;
+      alert("Failed to start payment: " + error.message); 
     }
   };
 
@@ -207,7 +224,8 @@ const WalletView = ({ userId }: { userId: string }) => {
             if (!walletDoc.exists()) throw new Error("Wallet does not exist!");
             
             t.update(orderDoc.ref, { status: 'paid', paidAt: serverTimestamp() });
-            const newBalance = (walletDoc.data().balance || 0) + amount;
+            const walletData = walletDoc.data();
+            const newBalance = (walletData?.balance || 0) + amount;
             t.set(txRef, { 
                 walletId: userId, 
                 type: 'credit', 
@@ -220,7 +238,10 @@ const WalletView = ({ userId }: { userId: string }) => {
             t.update(walletRef, { balance: newBalance, updatedAt: serverTimestamp() });
         });
         await logEvent('payment_success', { amount }, userId);
-     } catch (e: any) { alert("Fulfillment failed: " + e.message); }
+     } catch (e: unknown) { 
+       const error = e as Error;
+       alert("Fulfillment failed: " + error.message); 
+     }
   };
 
   return (
@@ -266,7 +287,8 @@ const useSystemPrompt = (type: 'report_gen' | 'chat_consultant') => {
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
-          setPromptContent(snapshot.docs[0].data().content);
+          const data = snapshot.docs[0].data();
+          setPromptContent(data.content as string);
         }
       });
       return () => unsubscribe();
@@ -283,7 +305,8 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
   const chatId = `chat_${report.reportId}`;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const systemPromptTemplate = useSystemPrompt('chat_consultant');
-  const recognitionRef = useRef<any>(null); // Type check for WebSpeech API isn't built-in easily for React refs without extending
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (!isConfigured) return;
@@ -296,21 +319,23 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
   }, [chatId]);
 
   const startListening = () => {
-    if (!('webkitSpeechRecognition' in window)) {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         alert("Voice input is not supported in this browser. Try Chrome.");
         return;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SpeechRecognition = (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) return;
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new SpeechRecognition() as any;
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-IN'; 
     
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: { results: Array<Array<{ transcript: string }>> }) => {
         const transcript = event.results[0][0].transcript;
         setInputText(prev => prev + (prev ? ' ' : '') + transcript);
     };
@@ -350,12 +375,21 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
         .replace('{{history}}', messages.map(m => `${m.sender.toUpperCase()}: ${m.content}`).join('\n'))
         .replace('{{question}}', userMessageContent);
 
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{ role: 'user', parts: [{ text: filledPrompt }] }]
+      const aiResponse = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: filledPrompt,
+          model: 'gemini-1.5-flash',
+        }),
       });
 
-      const rawText = aiResponse.text || "...";
+      if (!aiResponse.ok) {
+        throw new Error('Failed to generate AI response');
+      }
+
+      const data = await aiResponse.json();
+      const rawText = data.text || "...";
       
       const isAnswer = rawText.trim().startsWith('[ANSWER]');
       const cleanText = rawText.replace(/^\[(ANSWER|CLARIFY)\]\s*/, '');
@@ -401,12 +435,13 @@ const ChatInterface = ({ user, profile, report, walletBalance }: { user: User, p
         await logEvent('chat_free_clarify', {}, user.uid);
       }
 
-    } catch (e: any) { 
-        console.error(e); 
-        if (e.message.includes("Insufficient Balance")) {
+    } catch (e: unknown) { 
+        const error = e as Error;
+        console.error(error); 
+        if (error.message.includes("Insufficient Balance")) {
             alert("The spirits are ready to answer, but your wallet is empty. Please recharge.");
         } else {
-            alert("Error: " + e.message); 
+            alert("Error: " + error.message); 
         }
     } finally { 
         setSending(false); 
@@ -491,13 +526,30 @@ const ReportGenerator = ({ profile, coreNumbers, existingReport, walletBalance }
         .replace('{{loshuGrid}}', JSON.stringify(coreNumbers.loshuGrid))
         .replace('{{missingNumbers}}', coreNumbers.missingNumbers.join(', '));
 
-      const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: [{ role: 'user', parts: [{ text: "Generate my Destiny Blueprint." }] }], config: { systemInstruction: filledPrompt } });
-      
-      const newReportData: FullReport = { reportId, userId: profile.uid, numerologyData: coreNumbers, fullReportMarkdown: response.text || "Error", createdAt: serverTimestamp() as Timestamp, version: 'v1.0' };
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: "Generate my Destiny Blueprint.",
+          systemInstruction: filledPrompt,
+          model: 'gemini-1.5-flash',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const data = await response.json();
+      const newReportData: FullReport = { reportId, userId: profile.uid, numerologyData: coreNumbers, fullReportMarkdown: data.text || "Error", createdAt: serverTimestamp() as Timestamp, version: 'v1.0' };
       await setDoc(doc(db, 'reports', reportId), newReportData);
       setGeneratedReport(newReportData);
       await logEvent('report_purchase', { reportId }, profile.uid);
-    } catch (e: any) { console.error(e); alert("Failed: " + e.message); } finally { setLoading(false); }
+    } catch (e: unknown) { 
+      const error = e as Error;
+      console.error(error); 
+      alert("Failed: " + error.message); 
+    } finally { setLoading(false); }
   };
 
   if (generatedReport) return <Card title="Your Destiny Blueprint" style={{ border: '2px solid #4f46e5' }}><div style={{ maxHeight: '500px', overflowY: 'auto', lineHeight: '1.6', color: '#333' }}><ReactMarkdown>{generatedReport.fullReportMarkdown}</ReactMarkdown></div></Card>;
@@ -546,7 +598,7 @@ export default function ClientApp() {
         setUser(currentUser);
         if (currentUser) {
           const docSnap = await getDoc(doc(db, 'users', currentUser.uid));
-          onSnapshot(doc(db, 'wallet', currentUser.uid), (snap) => setWalletBalance(snap.exists() ? snap.data().balance || 0 : 0));
+          onSnapshot(doc(db, 'wallet', currentUser.uid), (snap) => setWalletBalance(snap.exists() ? snap.data()?.balance || 0 : 0));
           onSnapshot(doc(db, 'reports', 'rep_' + currentUser.uid), (snap) => { if (snap.exists()) setFullReport(snap.data() as FullReport); });
   
           if (docSnap.exists()) {
@@ -580,6 +632,13 @@ export default function ClientApp() {
              <Button variant="secondary" onClick={handleLogout} style={{ marginBottom: 0 }}>Logout</Button>
           </div>
         </header>
+        <nav style={{ maxWidth: '800px', margin: '0 auto 20px auto', display: 'flex', gap: '15px', flexWrap: 'wrap', fontSize: '0.9rem' }}>
+          <Link href="/about" style={{ color: '#666', textDecoration: 'none' }}>About</Link>
+          <Link href="/pricing" style={{ color: '#666', textDecoration: 'none' }}>Pricing</Link>
+          <Link href="/contact" style={{ color: '#666', textDecoration: 'none' }}>Contact</Link>
+          <Link href="/privacy" style={{ color: '#666', textDecoration: 'none' }}>Privacy</Link>
+          <Link href="/terms" style={{ color: '#666', textDecoration: 'none' }}>Terms</Link>
+        </nav>
         <main style={{ maxWidth: '800px', margin: '0 auto' }}>
           <WalletView userId={user.uid} />
           <Card title="Your Core Numerology">
@@ -600,6 +659,15 @@ export default function ClientApp() {
           {coreNumbers && <ReportGenerator profile={profile} coreNumbers={coreNumbers} walletBalance={walletBalance} existingReport={fullReport} />}
           {fullReport && <ChatInterface user={user} profile={profile} report={fullReport} walletBalance={walletBalance} />}
         </main>
+        <footer style={{ maxWidth: '800px', margin: '40px auto 0 auto', paddingTop: '20px', borderTop: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#666', textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <Link href="/privacy" style={{ textDecoration: 'none', color: '#666' }}>Privacy Policy</Link>
+            <Link href="/terms" style={{ textDecoration: 'none', color: '#666' }}>Terms & Conditions</Link>
+            <Link href="/refund" style={{ textDecoration: 'none', color: '#666' }}>Refund Policy</Link>
+          </div>
+          <p style={{ margin: 0 }}>© {new Date().getFullYear()} DestinyAI. All rights reserved.</p>
+        </footer>
       </div>
     );
 }
+

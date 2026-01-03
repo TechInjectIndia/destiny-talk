@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 
 export interface CardProps {
@@ -13,16 +15,13 @@ export const Card = ({ children, title, style = {} }: CardProps) => (
   </div>
 );
 
-export interface ButtonProps {
-  onClick: () => void;
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  onClick?: () => void;
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'danger' | 'success';
-  disabled?: boolean;
-  style?: React.CSSProperties;
-  title?: string;
 }
 
-export const Button = ({ onClick, children, variant = 'primary', disabled = false, style = {}, title }: ButtonProps) => {
+export const Button = ({ onClick, children, variant = 'primary', disabled = false, style = {}, title, type, ...props }: ButtonProps) => {
   let bg = '#000';
   let color = '#fff';
 
@@ -35,6 +34,8 @@ export const Button = ({ onClick, children, variant = 'primary', disabled = fals
       onClick={onClick}
       disabled={disabled}
       title={title}
+      type={type || 'button'}
+      {...props}
       style={{ 
         padding: '10px 20px', 
         backgroundColor: disabled ? '#ccc' : bg, 
@@ -55,6 +56,7 @@ export const Button = ({ onClick, children, variant = 'primary', disabled = fals
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  style?: React.CSSProperties;
 }
 
 export const Input = ({ label, style = {}, ...props }: InputProps) => (
@@ -76,6 +78,8 @@ export const Input = ({ label, style = {}, ...props }: InputProps) => (
 
 export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
+  rows?: number;
+  style?: React.CSSProperties;
 }
 
 export const TextArea = ({ label, rows = 5, style = {}, ...props }: TextAreaProps) => (
@@ -118,7 +122,7 @@ export const PaymentModal = ({ amount, onClose, onSuccess }: PaymentModalProps) 
             }
         }, 2000);
         return () => clearTimeout(timer);
-    }, []);
+    }, [onSuccess]);
 
     return (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
