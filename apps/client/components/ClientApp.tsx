@@ -596,26 +596,43 @@ export default function ClientApp() {
   
     const handleLogout = async () => await signOut(auth);
   
-    if (!user) return <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh', padding: '20px' }}><h1 style={{ textAlign: 'center', marginBottom: '40px' }}>🔮 DestinyAI</h1><AuthScreen onLogin={() => {}} /></div>;
-    if (!profile) return <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh', padding: '20px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '600px', margin: '0 auto' }}><h1>🔮 DestinyAI</h1><Button variant="secondary" onClick={handleLogout}>Logout</Button></div><OnboardingScreen user={user} onComplete={() => window.location.reload()} /></div>;
+    if (!user) return <div style={{ backgroundColor: '#f9fafb', minHeight: '100vh', padding: '20px' }}><h1 style={{ textAlign: 'center', marginBottom: '40px' }}>🔮 DestinyAI</h1><AuthScreen onLogin={() => {}} /></div>;
+    if (!profile) return <div style={{ backgroundColor: '#f9fafb', minHeight: '100vh', padding: '20px' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '600px', margin: '0 auto' }}><h1>🔮 DestinyAI</h1><Button variant="secondary" onClick={handleLogout}>Logout</Button></div><OnboardingScreen user={user} onComplete={() => window.location.reload()} /></div>;
   
     return (
-      <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '20px' }}>
-        <header style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div><h1 style={{ margin: 0 }}>🔮 DestinyAI</h1><span style={{ fontSize: '0.9rem', color: '#666' }}>Welcome, {profile.displayName}</span></div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-             <div style={{ padding: '8px 16px', background: '#fff', borderRadius: '20px', fontWeight: 'bold', border: '1px solid #ddd', color: walletBalance > 0 ? 'green' : '#000' }}>₹{walletBalance}</div>
-             <Button variant="secondary" onClick={handleLogout} style={{ marginBottom: 0 }}>Logout</Button>
+      <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
+        {/* Sticky Navigation */}
+        <nav className="sticky-nav">
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              {/* Logo and Welcome */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <h1 className="nav-logo">🔮 DestinyAI</h1>
+                </Link>
+                <span className="welcome-text text-body" style={{ fontSize: 'var(--text-sm)', color: '#6b7280', fontWeight: 400 }}>Welcome, {profile.displayName}</span>
+              </div>
+
+              {/* Navigation Links */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.875rem' }}>
+                <Link href="/about" className="nav-link">About</Link>
+                <Link href="/pricing" className="nav-link">Pricing</Link>
+                <Link href="/contact" className="nav-link">Contact</Link>
+                <Link href="/privacy" className="nav-link">Privacy</Link>
+                <Link href="/terms" className="nav-link">Terms</Link>
+              </div>
+
+              {/* Wallet Balance and Logout */}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="wallet-badge">₹{walletBalance}</div>
+                <Button variant="secondary" onClick={handleLogout} style={{ marginBottom: 0, fontSize: '0.875rem', padding: '8px 16px' }}>Logout</Button>
+              </div>
+            </div>
           </div>
-        </header>
-        <nav style={{ maxWidth: '800px', margin: '0 auto 20px auto', display: 'flex', gap: '15px', flexWrap: 'wrap', fontSize: '0.9rem' }}>
-          <Link href="/about" style={{ color: '#666', textDecoration: 'none' }}>About</Link>
-          <Link href="/pricing" style={{ color: '#666', textDecoration: 'none' }}>Pricing</Link>
-          <Link href="/contact" style={{ color: '#666', textDecoration: 'none' }}>Contact</Link>
-          <Link href="/privacy" style={{ color: '#666', textDecoration: 'none' }}>Privacy</Link>
-          <Link href="/terms" style={{ color: '#666', textDecoration: 'none' }}>Terms</Link>
         </nav>
-        <main style={{ maxWidth: '800px', margin: '0 auto' }}>
+
+        {/* Main Content */}
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
           <WalletView userId={user.uid} />
           <Card title="Your Core Numerology">
             {coreNumbers ? (
@@ -635,7 +652,7 @@ export default function ClientApp() {
           {coreNumbers && <ReportGenerator profile={profile} coreNumbers={coreNumbers} walletBalance={walletBalance} existingReport={fullReport} />}
           {fullReport && <ChatInterface user={user} profile={profile} report={fullReport} walletBalance={walletBalance} />}
         </main>
-        <footer style={{ maxWidth: '800px', margin: '40px auto 0 auto', paddingTop: '20px', borderTop: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#666', textAlign: 'center' }}>
+        <footer style={{ maxWidth: '1200px', margin: '40px auto 0 auto', padding: '20px', borderTop: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#666', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
             <Link href="/privacy" style={{ textDecoration: 'none', color: '#666' }}>Privacy Policy</Link>
             <Link href="/terms" style={{ textDecoration: 'none', color: '#666' }}>Terms & Conditions</Link>

@@ -10,21 +10,26 @@ interface PageLayoutProps {
 
 export default function PageLayout({ children, title }: PageLayoutProps) {
   return (
-    <div style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '20px' }}>
-      <header style={{ maxWidth: '1200px', margin: '0 auto', marginBottom: '30px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h1 style={{ margin: 0 }}>🔮 DestinyAI</h1>
-          </Link>
-          <nav style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <Link href="/" style={{ textDecoration: 'none', color: '#666', fontSize: '0.9rem' }}>Home</Link>
-            <Link href="/about" style={{ textDecoration: 'none', color: '#666', fontSize: '0.9rem' }}>About</Link>
-            <Link href="/pricing" style={{ textDecoration: 'none', color: '#666', fontSize: '0.9rem' }}>Pricing</Link>
-            <Link href="/contact" style={{ textDecoration: 'none', color: '#666', fontSize: '0.9rem' }}>Contact</Link>
-          </nav>
+    <div className="bg-red-200" style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
+      {/* Sticky Navigation */}
+      <nav className="sticky-nav">
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h1 className="nav-logo">🔮 DestinyAI</h1>
+            </Link>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.875rem' }}>
+              <Link href="/" className="nav-link">Home</Link>
+              <Link href="/about" className="nav-link">About</Link>
+              <Link href="/pricing" className="nav-link">Pricing</Link>
+              <Link href="/contact" className="nav-link">Contact</Link>
+              <Link href="/privacy" className="nav-link">Privacy</Link>
+              <Link href="/terms" className="nav-link">Terms</Link>
+            </div>
+          </div>
         </div>
-      </header>
-      <main style={{ maxWidth: '800px', margin: '0 auto' }}>
+      </nav>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
         <Card title={title}>
           {children}
         </Card>
