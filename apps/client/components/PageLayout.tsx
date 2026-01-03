@@ -1,53 +1,42 @@
 'use client';
 
 import Link from 'next/link';
-import { Card } from '@destiny-ai/ui';
+import { Card, Navigation, Footer } from '@destiny-ai/ui';
 
 interface PageLayoutProps {
   children: React.ReactNode;
   title: string;
 }
 
+const navigationLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/about', label: 'About' },
+  { href: '/pricing', label: 'Pricing' },
+  { href: '/contact', label: 'Contact' },
+  { href: '/privacy', label: 'Privacy' },
+  { href: '/terms', label: 'Terms' },
+];
+
+const footerLinks = [
+  { href: '/privacy', label: 'Privacy Policy' },
+  { href: '/terms', label: 'Terms & Conditions' },
+  { href: '/refund', label: 'Refund Policy' },
+];
+
 export default function PageLayout({ children, title }: PageLayoutProps) {
+  const logo = (
+    <Link href="/" className="no-underline text-inherit">
+      <h1 className="nav-logo text-gradient m-0">🔮 DestinyAI</h1>
+    </Link>
+  );
+
   return (
-    <div className="bg-red-200" style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
-      {/* Sticky Navigation */}
-      <nav className="sticky-nav">
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <h1 className="nav-logo">🔮 DestinyAI</h1>
-            </Link>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.875rem' }}>
-              <Link href="/" className="nav-link">Home</Link>
-              <Link href="/about" className="nav-link">About</Link>
-              <Link href="/pricing" className="nav-link">Pricing</Link>
-              <Link href="/contact" className="nav-link">Contact</Link>
-              <Link href="/privacy" className="nav-link">Privacy</Link>
-              <Link href="/terms" className="nav-link">Terms</Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
-        <Card title={title}>
-          {children}
-        </Card>
-        <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e5e7eb', fontSize: '0.875rem', color: '#666', textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '10px' }}>
-            <Link href="/privacy" style={{ textDecoration: 'none', color: '#666' }}>Privacy Policy</Link>
-            <Link href="/terms" style={{ textDecoration: 'none', color: '#666' }}>Terms & Conditions</Link>
-            <Link href="/refund" style={{ textDecoration: 'none', color: '#666' }}>Refund Policy</Link>
-          </div>
-          <p style={{ margin: 0 }}>© {new Date().getFullYear()} DestinyAI. All rights reserved.</p>
-        </div>
+    <div className="bg-gradient-to-br from-gray-50 via-white to-purple-50/30 min-h-screen">
+      <Navigation logo={logo} links={navigationLinks} LinkComponent={Link} />
+      <main className="max-w-7xl mx-auto p-5">
+        <Card title={title}>{children}</Card>
+        <Footer links={footerLinks} LinkComponent={Link} />
       </main>
     </div>
   );
 }
-
-
-
-
-
-

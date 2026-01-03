@@ -22,14 +22,14 @@ export default function ContactPage() {
 
   return (
     <PageLayout title="Contact Us">
-      <div style={{ lineHeight: '1.8', color: '#333' }}>
-        <p style={{ marginBottom: '30px' }}>
+      <div className="leading-relaxed text-gray-800">
+        <p className="mb-8">
           Have questions or feedback? We'd love to hear from you. Fill out the form below or reach out to us directly.
         </p>
 
         {submitted ? (
-          <Card title="Message Sent" style={{ borderLeft: '4px solid #10b981' }}>
-            <p style={{ color: '#059669', margin: 0 }}>
+          <Card title="Message Sent" className="border-l-4 border-green-500">
+            <p className="text-green-700 m-0">
               Thank you for contacting us! We'll get back to you within 24-48 hours.
             </p>
           </Card>
@@ -69,15 +69,15 @@ export default function ContactPage() {
           </form>
         )}
 
-        <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' }}>
-          <h3 style={{ marginTop: 0, color: '#111' }}>Other Ways to Reach Us</h3>
-          <p style={{ marginBottom: '10px' }}>
+        <div className="mt-10 pt-5 border-t border-gray-200">
+          <h3 className="mt-0 text-gray-900">Other Ways to Reach Us</h3>
+          <p className="mb-2.5">
             <strong>Email:</strong> support@destinyai.com
           </p>
-          <p style={{ marginBottom: '10px' }}>
+          <p className="mb-2.5">
             <strong>Response Time:</strong> We typically respond within 24-48 hours
           </p>
-          <p style={{ marginBottom: 0 }}>
+          <p className="mb-0">
             <strong>Business Hours:</strong> Monday - Friday, 9 AM - 6 PM IST
           </p>
         </div>
@@ -85,9 +85,3 @@ export default function ContactPage() {
     </PageLayout>
   );
 }
-
-
-
-
-
-

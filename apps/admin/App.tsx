@@ -110,7 +110,7 @@ const AdminPromptManager = () => {
             </Card>
         ) : (
             <>
-                <Card title="Active Prompt" style={{ borderLeft: '4px solid green' }}>
+                <Card title="Active Prompt" className="border-l-4 border-green-500">
                      {activePrompt ? (
                         <div><strong>Version: {activePrompt.version}</strong><pre style={{ whiteSpace: 'pre-wrap', maxHeight: '100px', overflow: 'hidden', background: '#f5f5f5', padding: '10px' }}>{activePrompt.content}</pre></div>
                      ) : <p>No active prompt set. Using system defaults.</p>}
