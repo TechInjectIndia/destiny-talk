@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "bun install",
+  "buildCommand": "bun run turbo run build --filter=admin --force --output-logs=full",
+  "outputDirectory": "apps/admin/.next",
+  "regions": ["bom1"],
+  "git": {
+    "deploymentEnabled": false
+  }
+}

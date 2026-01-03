@@ -11,7 +11,8 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "deploy:client": "cd apps/client && source ../../.env && vercel --prod -t $VERCEL_TOKEN",
-    "deploy:admin": "cd apps/admin && source ../../.env && vercel --prod -t $VERCEL_TOKEN"
+    "deploy:admin": "cd apps/admin && source ../../.env && vercel --prod -t $VERCEL_TOKEN",
+    "deploy": "chmod +x deploy.sh && bash deploy.sh"
   },
   "devDependencies": {
     "turbo": "latest",

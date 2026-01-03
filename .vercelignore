@@ -1,0 +1,51 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs (will be rebuilt on Vercel)
+.svelte-kit
+dist
+build
+.next
+.nuxt
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Turbo cache (can be very large!)
+.turbo
+.turbo/**
+**/.turbo
+**/.turbo/**
+
+# Cache
+.cache
+*.tsbuildinfo
+
+# Large binary files
+*.tar.zst
+*.tar.gz
+*.zip
